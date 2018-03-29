@@ -19,19 +19,26 @@ classdef Properties < handle
     
     methods
         function obj = Properties()
-            obj.acc = 0;
-            obj.speed = 0;
-            obj.pos = 0;
-            obj.lane = 0;
-            
-            
-                
+            obj.acc = nan;
+            obj.speed = nan;
+            obj.pos = nan;
+            obj.lane = nan;
         end
         
+        function update(self, data)
+            if ~isnan(data.acc)
+                self.acc = data.acc; end
+            if ~isnan(data.speed)
+                self.speed = data.speed; end
+            if ~isnan(data.pos)
+                self.pos = data.pos; end
+            if ~isnan(data.lane)
+                self.lane = data.lane; end
+        end
 %       Always keep this updated to reflect 
 %       how many properties this class holds
-        function l = length(self)
-            l = 4;
-        end
+%         function l = length(self)
+%             l = 4;
+%         end
     end
 end

@@ -13,7 +13,7 @@ classdef Ticks < handle
     methods
         function obj = Ticks(end_time, step_size, reaction_time)
             obj.ticks = containers.Map('KeyType', 'double', 'ValueType', 'any');
-            for i = [0: step_size: end_time]
+            for i =[0: step_size: end_time]
                 obj.ticks(i) = Properties();
             end
             
@@ -28,7 +28,24 @@ classdef Ticks < handle
         function r = get_time_tick(self, n)
             r = self.ticks(n);
         end
-
+        
+        function r = get_previous_n_ticks(self, n)
+            r = [];
+            prev_ticks = (self.current_tick - n*self.step_size:...
+                            self.step_size:...
+                            self.current_tick - self.step_size);
+            for t=prev_ticks
+                if t < self.start_time
+                    continue;
+                end
+                
+                if isempty(r)
+                    r = self.ticks(t);
+                else
+                    r = [r, self.ticks(t)];
+                end
+            end
+        end
         function r = get_prev_tick(self)
             r = self.get_time_tick(self.current_tick - self.step_size);
         end
@@ -52,7 +69,8 @@ classdef Ticks < handle
             if nargin < 3
                 tick_number = self.current_tick;
             end
-            self.ticks(tick_number) = data; 
+            tick = self.ticks(tick_number);
+            tick.update(data); 
             
         end
         
