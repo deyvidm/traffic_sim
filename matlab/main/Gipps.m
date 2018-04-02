@@ -17,9 +17,11 @@ classdef Gipps < handle
         ticks
         step_size
         
+        lane_change_speed_threshold
         ticks_window_for_avg_speed
         new_follower;
         new_follower_countdown;
+        bayesian;
     end
     
     methods
@@ -35,12 +37,14 @@ classdef Gipps < handle
             obj.time_diff = time_diff;
             
             obj.reaction_time = reaction_time;
+            obj.lane_change_speed_threshold = 0.9;
             obj.ticks_window_for_avg_speed = 5;
             
 %           used for keeping track of when (and who) will follow this car 
 %           after a lane change
             obj.new_follower = [];
             obj.new_follower_countdown = -1;
+            obj.bayesian = BayesianInference(1,1);
         end
         
         function set_time(self, end_time, step_size)
@@ -51,7 +55,7 @@ classdef Gipps < handle
 %       methods that define/change state
 %       i.e. the meat of the models
 
-%       car-following models and state
+%%%%%%%% car-following models and state
         function s = speed(self, prev_speed, l_prev_pos, l_prev_speed, prev_pos)
               d = [
                 prev_speed                                                  ...
@@ -92,28 +96,75 @@ classdef Gipps < handle
             a = (1/time_diff) * (speed - prev_speed);
         end
             
-%       lane-changing models and state
-        function r = need_to_change_lane(self)
+%%%%%%%% lane-changing models and state
+        function r = need_to_change_lane(self, new_leader)
             r = 0;
             
-% --------- remove me
-            props = self.ticks.get_current_tick();
-            if props.lane > 1
+            if isempty(self.leader)
                 return
             end
-% --------- remove me
             
-            v = self.get_avg_speed();
-            p = exp(-(v/self.target_speed)^2);
-            r = p;
+%           don't change lanes if i'm traveling at X% of my target speed
+            if self.get_avg_speed()/self.target_speed >= self.lane_change_speed_threshold
+                return
+            end
+            
+            new_leader_props = new_leader.ticks.get_current_tick();
+            curr_leader_props = self.leader.ticks.get_current_tick();
+            
+            if new_leader_props.speed > curr_leader_props.speed
+                r = 1;
+            end
         end
         
-        function l = able_to_change_lane(self)
+        function l = able_to_change_lane(self, new_follower, new_leader)
             l = 1;
+            if isempty(new_follower)
+                return
+            end
+            new_follower_props = new_follower.get_current_props();
+            props = self.get_current_props();
+            
+            back_spacing = props.pos - new_follower_props.pos - new_follower.size;
+            if new_follower_props.speed * 2 > back_spacing
+                l = 0;
+            end
+            fprintf("\tspeed*2: %0.3f\tspacing: %0.3f\n", back_spacing, new_follower_props.speed*2);
+            
+            front_spacing = self.preferred_spacing + self.size;
+            new_leader_props = new_leader.get_current_props();
+            if (props.pos + props.speed * 2) - (new_leader_props.pos + new_leader_props.speed * 2) > front_spacing
+                l = 0;
+            end
+            
+        end
+        
+        function a = lane_change_approved(self, props)
+            a = 0;
+            
+            if self.road.car_in_leftmost_lane(self) || self.new_follower_countdown >= 0
+                return
+            end
+            
+            lane = self.road.get_lane_left_of(props.lane);
+            [back, front] = self.road.get_spread_at_pos(lane, props.pos);
+            r = 0;
+
+            if self.need_to_change_lane(front) && self.able_to_change_lane(back, front)
+                r = 1;
+            end
+            [p,v] = self.bayesian.update(r);
+            if self.name == "follower_1"
+                fprintf("p=%0.5f\tv=%0.5f\ta=%d\tb=%d\tneed:%d\table: %d\n", p, v, self.bayesian.alpha, self.bayesian.beta,self.need_to_change_lane(front),self.able_to_change_lane(back, front));
+            end
+            if p > 0.60 && v < 0.05
+                a = 1;
+            end
+                
         end
         
 
-%       utility regarding state/models
+%%%%%%% utility regarding state/models
         function s = get_avg_speed(self)
             speed_ticks = self.ticks.get_previous_n_ticks(self.ticks_window_for_avg_speed);
             total_speed = 0;
@@ -143,42 +194,30 @@ classdef Gipps < handle
             p = self.ticks.get_prev_tick();
         end
         
-        function l = change_lane_left(self)
-            l = self.road.change_lane_left(self);
-        end
-        
-        function l = change_lane_right(self)
-            l = self.road.change_lane_right(self);
-        end
-        
         function set_lane(self, lane)
             data = Properties();
             data.lane = lane;
             self.ticks.update_tick_data(data);
         end
         
-        function swap_lane_change_roles(self, lane, pos)
-            [back, front] = self.road.get_spread_at_pos(lane, pos);
-%               this is a problem if there is no new leader -- need to fix
-%               this
+        function swap_lane_change_roles(self, back, front)
+%           this is a problem if there is no new leader -- need to fix this
             if ~isempty(self.leader) && ~isempty(self.followers)
                 for f = self.followers
                     f.start_following(self.leader);
                 end
-%                 self.leader.follower = self.follower;
             end
-%             if ~isempty(self.follower)
-%                 self.follower.leader = self.leader;
-%             end
-            self.start_following(front);
-%             self.leader = front;
-            self.new_follower = back;
-            self.new_follower_countdown = 2;
+            if ~isempty(front)
+                self.start_following(front);
+            end
+            if ~isempty(back)
+                self.new_follower = back;
+                self.new_follower_countdown = 2;
+            end
         end
         
-%       procedural
+%%%%%%% procedural
         function perform_properties_tick(self)
-            disp(strcat("from tick ----- ", self.name))
             self.ticks.advance_tick();
             
             previous_data = self.ticks.get_prev_tick();
@@ -230,21 +269,18 @@ classdef Gipps < handle
             if self.new_follower_countdown > 0
                 self.new_follower_countdown = self.new_follower_countdown - 1;
             end
-            if self.new_follower_countdown == 0
+            if self.new_follower_countdown == 0 && ~isempty(self.new_follower)
+                self.new_follower.name
                 self.new_follower.start_following(self);
                 self.new_follower_countdown = -1;
             end
     
             props = self.ticks.get_current_tick();
             lane = props.lane;
-            
-            if ~isempty(self.leader) && self.need_to_change_lane() && self.able_to_change_lane()
-                lane = self.change_lane_left();
-                if lane
-                    self.swap_lane_change_roles(lane, props.pos)
-                else
-                    lane = previous_data.lane;
-                end
+                
+            if self.lane_change_approved(props)
+                [lane, back, front] = self.road.change_lane_left(self);
+                self.swap_lane_change_roles(back, front)
             end
             
             data = Properties();

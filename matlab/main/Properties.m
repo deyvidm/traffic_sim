@@ -3,17 +3,6 @@ classdef Properties < handle
         acc
         speed
         pos
-        
-        % for lanes, the lower the number, the further to the left 
-        % example: 3-lane road going in only 1 direction
-        % lane 0 == leftmost lane
-        % lane 1 == middle lane
-        % lane 2 == rightmost lane
-        
-        % illustration: 
-        % =======[ A ]=========>    Lane 0
-        % =======[ B ]=========>    Lane 1
-        % =======[ C ]=========>    Lane 2
         lane
     end
     

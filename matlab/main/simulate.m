@@ -41,14 +41,14 @@ follower_2.start_following(leader_2);
 data = Properties();
 data.speed = 10;
 data.acc = 0;
-data.pos = 40;
+data.pos = 80;
 data.lane = 1;
 leader_1.ticks.fill_tick_data(data, 0, end_time);
 
 data = Properties();
-data.speed = 10;
+data.speed = 11;
 data.acc = 0;
-data.pos = 40;
+data.pos = 80;
 data.lane = 2;
 leader_2.ticks.fill_tick_data(data, 0, end_time);
 
@@ -56,14 +56,14 @@ leader_2.ticks.fill_tick_data(data, 0, end_time);
 data = Properties();
 data.speed = 10;
 data.acc = 0;   
-data.pos = 20;
+data.pos = 60;
 data.lane = 1;
 follower_1.ticks.update_tick_data(data, 0);
 
 data = Properties();
 data.speed = 10;
 data.acc = 0;   
-data.pos = 15;
+data.pos = 17;
 data.lane = 2;
 follower_2.ticks.update_tick_data(data, 0);
 
