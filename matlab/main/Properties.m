@@ -24,10 +24,10 @@ classdef Properties < handle
             if ~isnan(data.lane)
                 self.lane = data.lane; end
         end
-%       Always keep this updated to reflect 
-%       how many properties this class holds
-%         function l = length(self)
-%             l = 4;
-%         end
+        
+        function obj = clone(self)
+            obj = Properties();
+            obj.update(self);
+        end
     end
 end

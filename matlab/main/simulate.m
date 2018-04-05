@@ -6,6 +6,7 @@ target_speed = 20;
 preferred_spacing = 0;
 reaction_time = 2/3;
 
+rng('shuffle');
 % reaction time combines with an unspecified theta to form the step size
 % if reaction time == 2/3  then theta is 1/3, making the step size 1
 end_time = 40;
@@ -63,7 +64,7 @@ follower_1.ticks.update_tick_data(data, 0);
 data = Properties();
 data.speed = 10;
 data.acc = 0;   
-data.pos = 17;
+data.pos = 40;
 data.lane = 2;
 follower_2.ticks.update_tick_data(data, 0);
 

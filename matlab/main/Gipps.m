@@ -104,6 +104,11 @@ classdef Gipps < handle
                 return
             end
             
+            if isempty(new_leader)
+                r = 1;
+                return
+            end
+            
 %           don't change lanes if i'm traveling at X% of my target speed
             if self.get_avg_speed()/self.target_speed >= self.lane_change_speed_threshold
                 return
@@ -122,17 +127,23 @@ classdef Gipps < handle
             if isempty(new_follower)
                 return
             end
-            new_follower_props = new_follower.get_current_props();
+           
+            
             props = self.get_current_props();
+            new_follower_props = self.fuzzify(props, new_follower.get_current_props());
             
             back_spacing = props.pos - new_follower_props.pos - new_follower.size;
             if new_follower_props.speed * 2 > back_spacing
                 l = 0;
             end
-            fprintf("\tspeed*2: %0.3f\tspacing: %0.3f\n", back_spacing, new_follower_props.speed*2);
+%             fprintf("\tspeed*2: %0.3f\tspacing: %0.3f\n", back_spacing, new_follower_props.speed*2);
+            
+            if isempty(new_leader)
+                return
+            end
             
             front_spacing = self.preferred_spacing + self.size;
-            new_leader_props = new_leader.get_current_props();
+            new_leader_props = self.fuzzify(props, new_leader.get_current_props());
             if (props.pos + props.speed * 2) - (new_leader_props.pos + new_leader_props.speed * 2) > front_spacing
                 l = 0;
             end
@@ -157,7 +168,7 @@ classdef Gipps < handle
             if self.name == "follower_1"
                 fprintf("p=%0.5f\tv=%0.5f\ta=%d\tb=%d\tneed:%d\table: %d\n", p, v, self.bayesian.alpha, self.bayesian.beta,self.need_to_change_lane(front),self.able_to_change_lane(back, front));
             end
-            if p > 0.60 && v < 0.05
+            if p > 0.3 && v < 0.3
                 a = 1;
             end
                 
@@ -165,6 +176,17 @@ classdef Gipps < handle
         
 
 %%%%%%% utility regarding state/models
+
+        function target_props = fuzzify(self, own_props, target_props)
+            space_diff = abs(own_props.pos - target_props.pos);
+            std_dev = 1-exp(-space_diff) * 2;
+            
+            ret = target_props.clone();
+            ret.speed = normrnd(target_props.speed, std_dev);
+            ret.pos = normrnd(target_props.pos, std_dev);
+            ret.acc = normrnd(target_props.acc, std_dev);
+        end
+    
         function s = get_avg_speed(self)
             speed_ticks = self.ticks.get_previous_n_ticks(self.ticks_window_for_avg_speed);
             total_speed = 0;
@@ -218,6 +240,7 @@ classdef Gipps < handle
         
 %%%%%%% procedural
         function perform_properties_tick(self)
+            disp(self.name)
             self.ticks.advance_tick();
             
             previous_data = self.ticks.get_prev_tick();
@@ -270,7 +293,6 @@ classdef Gipps < handle
                 self.new_follower_countdown = self.new_follower_countdown - 1;
             end
             if self.new_follower_countdown == 0 && ~isempty(self.new_follower)
-                self.new_follower.name
                 self.new_follower.start_following(self);
                 self.new_follower_countdown = -1;
             end
