@@ -100,12 +100,7 @@ classdef Gipps < handle
         function r = need_to_change_lane(self, new_leader)
             r = 0;
             
-            if isempty(self.leader)
-                return
-            end
-            
-            if isempty(new_leader)
-                r = 1;
+            if isempty(self.leader) || isempty(new_leader)
                 return
             end
             
@@ -168,7 +163,9 @@ classdef Gipps < handle
             if self.name == "follower_1"
                 fprintf("p=%0.5f\tv=%0.5f\ta=%d\tb=%d\tneed:%d\table: %d\n", p, v, self.bayesian.alpha, self.bayesian.beta,self.need_to_change_lane(front),self.able_to_change_lane(back, front));
             end
-            if p > 0.3 && v < 0.3
+%           dipping p below 3 will cause mayhem with the models -- it'll
+%           make the leader try to change lanes lol
+            if p > 0.5 && v < 0.3
                 a = 1;
             end
                 
@@ -240,7 +237,6 @@ classdef Gipps < handle
         
 %%%%%%% procedural
         function perform_properties_tick(self)
-            disp(self.name)
             self.ticks.advance_tick();
             
             previous_data = self.ticks.get_prev_tick();
